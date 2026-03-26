@@ -8,6 +8,8 @@ st.set_page_config(page_title="會議紀錄 Chatbot", page_icon="📋", layout="
 # ---------- 讀取設定 ----------
 QWEN_API_KEY = st.secrets.get("QWEN_API_KEY", "") or ""
 ADMIN_PASSWORD = st.secrets.get("ADMIN_PASSWORD", "") or ""
+GITHUB_TOKEN = st.secrets.get("GITHUB_TOKEN", "") or ""
+GITHUB_REPO = st.secrets.get("GITHUB_REPO", "") or ""
 
 # ---------- 側邊欄 ----------
 with st.sidebar:
@@ -46,8 +48,8 @@ if mode == "🔧 管理員":
     )
     if uploaded_files and st.button("確認上傳", type="primary"):
         for uf in uploaded_files:
-            with st.spinner(f"上傳 {uf.name}..."):
-                upload_pdf(uf.getvalue(), uf.name)
+            with st.spinner(f"上傳 {uf.name}（同步到 GitHub）..."):
+                upload_pdf(uf.getvalue(), uf.name, GITHUB_TOKEN, GITHUB_REPO)
             st.success(f"✅ 已上傳：{uf.name}")
         st.session_state.pop("docs", None)
         st.rerun()
@@ -62,7 +64,7 @@ if mode == "🔧 管理員":
             col1, col2 = st.columns([4, 1])
             col1.write(f"📎 {f['name']}")
             if col2.button("🗑️", key=f"del_{f['name']}", help=f"刪除 {f['name']}"):
-                delete_pdf(f["name"])
+                delete_pdf(f["name"], GITHUB_TOKEN, GITHUB_REPO)
                 st.success(f"已刪除：{f['name']}")
                 st.session_state.pop("docs", None)
                 st.rerun()
