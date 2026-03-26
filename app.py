@@ -3,7 +3,7 @@ from pdf_utils import upload_pdf, delete_pdf, list_pdfs, load_all_meeting_docs
 from qwen_chat import get_qwen_client, chat_with_docs
 
 # ---------- 頁面設定 ----------
-st.set_page_config(page_title="會議紀錄 Chatbot", page_icon="📋", layout="wide")
+st.set_page_config(page_title="中華基督教會基慈小學 — 會議紀錄 Chatbot", page_icon="📋", layout="wide")
 
 # ---------- 讀取設定 ----------
 QWEN_API_KEY = st.secrets.get("QWEN_API_KEY", "") or ""
@@ -13,7 +13,8 @@ GITHUB_REPO = st.secrets.get("GITHUB_REPO", "") or ""
 
 # ---------- 側邊欄 ----------
 with st.sidebar:
-    st.header("📋 會議紀錄 Chatbot")
+    st.header("📋 中華基督教會基慈小學")
+    st.caption("會議紀錄 Chatbot")
 
     if not QWEN_API_KEY:
         QWEN_API_KEY = st.text_input("Qwen API Key", type="password")
@@ -73,7 +74,8 @@ if mode == "🔧 管理員":
 # ==========================================
 # 聊天模式
 # ==========================================
-st.title("📋 會議紀錄 Chatbot")
+st.title("📋 中華基督教會基慈小學")
+st.subheader("會議紀錄 Chatbot")
 st.caption("根據已上傳的會議紀錄 PDF，使用 AI 回答老師問題")
 
 if not QWEN_API_KEY:
