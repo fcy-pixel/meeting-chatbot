@@ -118,6 +118,33 @@ def build_calendar_events(all_events: list) -> list:
     return result
 
 
+def get_events_for_date(target: str, all_events: list) -> list:
+    """Return all events that cover target date (YYYY-MM-DD), including multi-day ones."""
+    try:
+        t = date.fromisoformat(target)
+    except ValueError:
+        return []
+    matched = []
+    for ev in all_events:
+        start_str = ev["start"][:10]
+        try:
+            ev_start = date.fromisoformat(start_str)
+        except ValueError:
+            continue
+        if ev.get("end"):
+            end_str = ev["end"][:10]
+            try:
+                # FullCalendar all-day end is exclusive
+                ev_end = date.fromisoformat(end_str) - timedelta(days=1)
+            except ValueError:
+                ev_end = ev_start
+        else:
+            ev_end = ev_start
+        if ev_start <= t <= ev_end:
+            matched.append(ev)
+    return matched
+
+
 # ---------- 頁面設定 ----------
 st.set_page_config(page_title="智慧校曆系統", page_icon="📅", layout="wide")
 
@@ -143,6 +170,8 @@ if "custom_events" not in st.session_state:
     st.session_state.custom_events = load_custom_events()
 if "saved_api_key" not in st.session_state:
     st.session_state.saved_api_key = st.secrets.get("QWEN_API_KEY", "") if hasattr(st, "secrets") else ""
+if "selected_date" not in st.session_state:
+    st.session_state.selected_date = str(date.today())
 
 # ---------- 頁首 ----------
 h_col1, h_col2 = st.columns([8, 2])
@@ -272,7 +301,7 @@ with st.sidebar:
 all_events = PRELOADED_EVENTS + st.session_state.custom_events
 calendar_events = build_calendar_events(all_events)
 
-st.caption("💡 點擊空白可新增，點擊色塊看詳情")
+st.caption("💡 點擊日期格即可查看當天所有活動")
 
 if HAS_CALENDAR:
     calendar_options = {
@@ -302,24 +331,63 @@ if HAS_CALENDAR:
         key="school_calendar",
     )
 
-    # 點擊活動顯示詳情
-    if cal_result and cal_result.get("eventClick"):
-        ev_info = cal_result["eventClick"]["event"]
-        with st.container():
-            st.markdown("---")
-            st.subheader(f"📌 {ev_info['title']}")
-            cols = st.columns(2)
-            cols[0].write(f"**開始：** {ev_info.get('start', '')[:10]}")
-            if ev_info.get("end"):
-                cols[1].write(f"**結束：** {ev_info['end'][:10]}")
-            desc = (ev_info.get("extendedProps") or {}).get("description", "")
-            if desc:
-                st.write(f"**備注：** {desc}")
-
-    # 點擊日期提示
+    # 點擊日期 → 顯示當天所有活動
     if cal_result and cal_result.get("dateClick"):
-        clicked_date = cal_result["dateClick"]["date"][:10]
-        st.info(f"📆 已選擇 {clicked_date}，請使用左側「手動新增活動」欄位新增事件")
+        st.session_state.selected_date = cal_result["dateClick"]["date"][:10]
+
+    # 點擊活動 → 跳到該活動所在日期
+    if cal_result and cal_result.get("eventClick"):
+        st.session_state.selected_date = cal_result["eventClick"]["event"]["start"][:10]
+
+    # ── 當天活動面板 ──
+    if st.session_state.get("selected_date"):
+        sel = st.session_state.selected_date
+        try:
+            sel_obj = date.fromisoformat(sel)
+            weekdays = ["一", "二", "三", "四", "五", "六", "日"]
+            sel_label = f"{sel_obj.year}年{sel_obj.month}月{sel_obj.day}日（星期{weekdays[sel_obj.weekday()]}）"
+        except ValueError:
+            sel_label = sel
+
+        day_events = get_events_for_date(sel, all_events)
+
+        st.markdown("---")
+        st.markdown(
+            f"""
+            <div style="background:#f0f4ff;border-left:5px solid #4a90e2;
+                        padding:12px 16px;border-radius:8px;margin-bottom:8px;">
+                <span style="font-size:1.1rem;font-weight:700;">📆 {sel_label}</span>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+        if not day_events:
+            st.info("當天沒有活動")
+        else:
+            for ev in day_events:
+                color = ev.get("color", "#607d8b")
+                cat   = ev.get("category", "")
+                desc  = ev.get("description", "")
+                start_time = ev["start"][11:16] if "T" in ev["start"] else ""
+                end_str    = f" → {ev['end'][:10]}" if ev.get("end") else ""
+                time_line  = f"<br><small style='color:#555'>{start_time}{end_str}</small>" if (start_time or end_str) else ""
+                desc_line  = f"<br><small style='color:#777'>📝 {desc}</small>" if desc else ""
+                st.markdown(
+                    f"""
+                    <div style="border-left:5px solid {color};
+                                background:#fff;padding:10px 14px;
+                                border-radius:6px;margin-bottom:8px;
+                                box-shadow:0 1px 4px rgba(0,0,0,0.08);">
+                        <span style="background:{color};color:#fff;font-size:0.72rem;
+                                    padding:2px 7px;border-radius:10px;
+                                    margin-right:8px;">{cat}</span>
+                        <strong>{ev['title']}</strong>
+                        {time_line}{desc_line}
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )
 
 else:
     st.warning("請安裝 streamlit-calendar：`pip install streamlit-calendar`")
